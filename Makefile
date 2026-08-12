@@ -70,8 +70,8 @@ clean_tox:
 clean_covs:
 	rm -rf ${ROOTDIR}/.coverage.*
 
-DASK_PORT ?= 6379
-DASK_DASHBOARD_PORT ?= 8265
+DASK_PORT ?= 8786
+DASK_DASHBOARD_PORT ?= 8787
 DASK_NUM_CPUS ?= 4
 IP ?= 127.0.0.1
 DASK_MEMORY_GB ?= 10
