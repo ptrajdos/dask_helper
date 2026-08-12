@@ -70,21 +70,20 @@ clean_tox:
 clean_covs:
 	rm -rf ${ROOTDIR}/.coverage.*
 
-RAY_PORT ?= 6379
-RAY_DASHBOARD_PORT ?= 8265
-RAY_NUM_CPUS ?= 4
+DASK_PORT ?= 6379
+DASK_DASHBOARD_PORT ?= 8265
+DASK_NUM_CPUS ?= 4
 IP ?= 127.0.0.1
-RAY_MEMORY_GB ?= 10
-RAY_OBJECT_STORE_GB ?= 2
+DASK_MEMORY_GB ?= 10
 
 # Start Dask head node (manager)
-dask-head: pypackages
-	$(UV) run dask-head --ip=$(IP) --port=$(RAY_PORT) --dashboard-port=$(RAY_DASHBOARD_PORT) --num-cpus=$(RAY_NUM_CPUS) --memory-gb=$(RAY_MEMORY_GB) --object-store-gb=$(RAY_OBJECT_STORE_GB)
+dask-scheduler: pypackages
+	$(UV) run dask-scheduler --ip=$(IP) --port=$(DASK_PORT) --dashboard-port=$(DASK_DASHBOARD_PORT)
 
 # Start Dask worker node
 # Usage: make dask-worker IP=<head-node-ip>
 dask-worker: pypackages
-	$(UV) run dask-worker --ip=$(IP) --port=$(RAY_PORT) --num-cpus=$(RAY_NUM_CPUS) --memory-gb=$(RAY_MEMORY_GB) --object-store-gb=$(RAY_OBJECT_STORE_GB)
+	$(UV) run dask-worker --ip=$(IP) --port=$(DASK_PORT) --num-cpus=$(DASK_NUM_CPUS) --memory-gb=$(DASK_MEMORY_GB)
 
 dask-stop: pypackages
 	$(UV) run dask-stop

@@ -8,6 +8,7 @@ dynamic = ["version", "readme"]
 dependencies = [    
     "LogKeeper @ git+https://github.com/ptrajdos/LogKeeper.git",
     "dask",
+    "bokeh>=3.1.0",
     "distributed",
     "joblib",
 ]
@@ -54,9 +55,9 @@ Repository = "https://github.com/ptrajdos/dask_helper.git"
 packages = { find = { include = ["dask_helper", "dask_helper.*"] } }
 
 [project.scripts]
-dask-head = "dask_helper.cli:dask_head"
-dask-worker = "dask_helper.cli:dask_worker"
-dask-stop = "dask_helper.cli:dask_stop"
+dask-scheduler = "dask_helper.dask_cli:dask_scheduler"
+dask-worker = "dask_helper.dask_cli:dask_worker"
+dask-stop = "dask_helper.dask_cli:dask_stop"
 
 [tool.coverage.run]
 branch = true
