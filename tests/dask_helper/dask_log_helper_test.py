@@ -1,0 +1,213 @@
+import os
+from pathlib import Path
+import time
+import unittest
+
+import joblib
+from joblib import Parallel, delayed
+from distributed import Client
+from dask_helper.dask_log_helper import DaskLogKeeperHelper
+from dask_helper._test_utils import compute
+from log_keeper.log_keeper import LogKeeper
+import multiprocessing as mp
+import threading as th
+
+
+def is_test_deamonic():
+    try:
+        with mp.Manager():
+            return False
+    except Exception:
+        return True
+
+
+def join_with_timeout(q, timeout=5):
+    done = []
+
+    def _join():
+        q.join()
+        done.append(True)
+
+    t = th.Thread(target=_join)
+    t.start()
+    t.join(timeout)
+    return bool(done)
+
+class TestDaskLogKeeperHelper(unittest.TestCase):
+
+    def generate_logs(self, logger, n=100):
+        for i in range(n):
+            logger.debug(f"Test log: {i} ")
+
+    def has_nonempty_files(self, directory):
+        return all(
+            os.path.isfile(os.path.join(directory, f))
+            and os.path.getsize(os.path.join(directory, f)) > 0
+            for f in os.listdir(directory)
+        )
+
+    def is_gzip_file(self, filepath):
+        try:
+            with open(filepath, "rb") as f:
+                return f.read(2) == b"\x1f\x8b"
+        except Exception:
+            return False
+
+    def has_gz_files(self, directory):
+        return any(
+            os.path.isfile(os.path.join(directory, f))
+            and self.is_gzip_file(os.path.join(directory, f))
+            for f in os.listdir(directory)
+        )
+
+    def check_temp_dir_init(self, temp_dir_path,should_be_empty=True):
+        self.assertTrue(
+            os.path.exists(temp_dir_path),
+            "Temporary Log directory not exists before tests.",
+        )
+        if should_be_empty:
+            self.assertTrue(
+                len(os.listdir(temp_dir_path)) == 0,
+                "Temporary directory is not empty before tests",
+            )
+        self.assertTrue(
+            os.access(temp_dir_path, os.W_OK),
+            "Temp directory not writable before tests",
+        )
+        self.assertTrue(
+            os.access(temp_dir_path, os.R_OK),
+            "Temp directory not readable before tests",
+        )
+        self.assertTrue(
+            os.access(temp_dir_path, os.X_OK),
+            "Temp directory not executable before tests",
+        )
+
+    def check_temp_dir_after(self, temp_dir_path, count_rows=True, exp_rows=100):
+
+        self.assertTrue(
+            os.path.exists(temp_dir_path), "Temporary Log directory not exists."
+        )
+        self.assertTrue(
+            os.access(temp_dir_path, os.W_OK),
+            "Temp directory not writable after logging.",
+        )
+        self.assertTrue(
+            os.access(temp_dir_path, os.R_OK),
+            "Temp directory not readable after logging.",
+        )
+        self.assertTrue(
+            os.access(temp_dir_path, os.X_OK),
+            "Temp directory not executable after logging.",
+        )
+
+        self.assertTrue(
+            len(os.listdir(temp_dir_path)) > 0,
+            "Temporary directory is empty after performing logging",
+        )
+
+        self.assertTrue(
+            self.has_nonempty_files(temp_dir_path),
+            "Temporary contain empty files after performing logging",
+        )
+        selected_files = list(Path(temp_dir_path).glob("logfile*.log*"))
+        self.assertTrue(
+            len(selected_files) > 0,
+            "Afert logging Temp directory contains no log files.",
+        )
+
+        for f in selected_files:
+            self.assertTrue(os.access(f, os.W_OK), f"Logfile {f} is not writable.")
+            self.assertTrue(os.access(f, os.R_OK), f"Logfile {f} is not readable.")
+
+        if count_rows:
+            for file in selected_files:
+                with open(file, "r") as fh:
+                    count = sum(1 for _ in fh)
+                    fh.seek(0)
+                    self.assertTrue(
+                        count == exp_rows,
+                        f"Wrong number of rows. Expected {exp_rows}, got {count}: {fh.read()} ) ",
+                    )
+
+
+    def test_getting_client_loggers_loky(self):
+        queue = LogKeeper.generate_logging_queue()
+
+        log_keeper = LogKeeper(
+            logging_queue=queue,
+            run_threaded=False,
+        )
+        log_keeper.start()
+        self.check_temp_dir_init(os.path.dirname(log_keeper.log_file_path), should_be_empty=False)
+
+
+        logger = LogKeeper.get_client_logger(logging_queue=queue, logger_name="MPC")
+        logger.debug("Before parallel")
+
+        log_helper = DaskLogKeeperHelper(
+            logging_queue=queue, backend="loky"
+        )
+        log_helper.start()
+        worker_logging_queue = log_helper.get_worker_queue()
+
+        n_total = 5
+        n_free_entries = 3
+        n_cum_logs = n_total + n_free_entries
+        deamonic_test = is_test_deamonic()
+
+        rets = Parallel(
+            n_jobs=-1,
+            total=n_total,
+            desc=f"Computations",
+            backend="threading" if deamonic_test else "loky",
+        )(delayed(compute)(name, worker_logging_queue) for name in [f"N_{i}" for i in range(n_total)])
+
+        logger.debug("After Parallel!")
+        time.sleep(3)
+        logger.debug("After sleep")
+        log_helper.quit()
+        log_keeper.quit()
+        self.assertTrue(queue == log_keeper.get_logging_queue(), "Queues are not equal")
+        self.check_temp_dir_after(os.path.dirname(log_keeper.log_file_path), count_rows=True, exp_rows=n_cum_logs)
+
+    def test_getting_client_loggers_dask(self):
+        client = Client(processes=False)
+        try:
+            queue = LogKeeper.generate_logging_queue()
+
+            log_keeper = LogKeeper(
+                logging_queue=queue,
+                run_threaded=False,
+            )
+            log_keeper.start()
+            self.check_temp_dir_init(os.path.dirname(log_keeper.log_file_path), should_be_empty=False)
+
+
+            logger = LogKeeper.get_client_logger(logging_queue=queue, logger_name="MPC")
+            logger.debug("Before parallel")
+
+            log_helper = DaskLogKeeperHelper(
+                logging_queue=queue, backend="dask"
+            )
+            log_helper.start()
+            worker_logging_queue = log_helper.get_worker_queue()
+
+            n_total = 5
+            n_free_entries = 3
+            n_cum_logs = n_total + n_free_entries
+
+            with joblib.parallel_config(backend="dask"):
+                rets = Parallel(
+                    n_jobs=-1,
+                )(delayed(compute)(name, worker_logging_queue) for name in [f"N_{i}" for i in range(n_total)])
+
+            logger.debug("After Parallel!")
+            time.sleep(3)
+            logger.debug("After sleep")
+            log_helper.quit()
+            log_keeper.quit()
+            self.assertTrue(queue == log_keeper.get_logging_queue(), "Queues are not equal")
+            self.check_temp_dir_after(os.path.dirname(log_keeper.log_file_path), count_rows=True, exp_rows=n_cum_logs)
+        finally:
+            client.close()

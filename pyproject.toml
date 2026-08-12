@@ -1,0 +1,63 @@
+[build-system]
+requires = ["setuptools>=77.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dask_helper"
+dynamic = ["version", "readme"]
+dependencies = [    
+    "LogKeeper @ git+https://github.com/ptrajdos/LogKeeper.git",
+    "dask",
+    "distributed",
+    "joblib",
+]
+requires-python = ">=3.10"
+authors = [
+  {name = "Pawel Trajdos", email = "pawel.trajdos@pwr.edu.pl"},
+]
+maintainers = [
+  {name = "Pawel Trajdos", email = "pawel.trajdos@pwr.edu.pl"}
+]
+description = "Helper functions for working with Dask"
+
+license = "BSD-3-Clause"
+license-files = ["LICEN[CS]E.*"]
+keywords = ["dask"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python"
+]
+[project.optional-dependencies]
+test = [
+    'coverage>=7.8.0, <8.0.0',
+    'unittest-parallel>=1.7.5, <2.0.0',
+    'pandas>=2.0.0, <3.0.0',
+    'pdoc3>=0.11.1, <1.0.0',
+    'pytest>=8.3.5, <9.0.0',
+    'pytest-cov>=6.1.1, <7.0.0',
+    'pytest-profiling>=1.8.1, <2.0.0',
+    'pytest-xdist>=3.6.1, <4.0.0',
+    'snakeviz>=2.2.2, <3.0.0',
+    'pytest-timer>=1.0.0, <2.0.0',
+    'tox>=4.0.0, <5.0.0',
+]
+
+
+[tool.setuptools.dynamic]
+version = {attr = "dask_helper.__version__"}  # any module attribute compatible with ast.literal_eval
+readme = {file = ["README.md"]}
+
+[project.urls]
+Repository = "https://github.com/ptrajdos/dask_helper.git"
+
+[tool.setuptools]
+packages = { find = { include = ["dask_helper", "dask_helper.*"] } }
+
+[project.scripts]
+dask-head = "dask_helper.cli:dask_head"
+dask-worker = "dask_helper.cli:dask_worker"
+dask-stop = "dask_helper.cli:dask_stop"
+
+[tool.coverage.run]
+branch = true
+parallel = true
