@@ -1,6 +1,7 @@
 import unittest
 
 import joblib
+import numpy as np
 from distributed import Client
 
 from dask_helper._test_utils import worker
@@ -61,6 +62,41 @@ class DaskSharedArgsTest(unittest.TestCase):
         data = [1, 2, 3]
         shared = SharedArg(data)
         self.assertIs(shared.resolve(), data)
+
+    def test_dask_shared_args_big_data_np(self):
+        """SharedArg with dask backend handles large data via scatter+replicate."""
+        client = Client(n_workers=2, threads_per_worker=1)
+        try:
+            big_data = np.arange(1_000_000)
+            with joblib.parallel_backend("dask", n_jobs=-1):
+                shared = SharedArg(big_data)
+                prepared = shared.prepare()
+
+                self.assertIsNotNone(shared.ref)
+                self.assertIs(prepared, shared.ref)
+
+                resolved = shared.resolve()
+                np.testing.assert_array_equal(resolved, big_data)
+        finally:
+            client.close()
+
+    def test_dask_shared_args_big_data_list(self):
+        """SharedArg with dask backend handles large data via scatter+replicate."""
+        client = Client(n_workers=2, threads_per_worker=1)
+        try:
+            big_data = [list(range(1000000)) for _ in range(10)]
+            with joblib.parallel_backend("dask", n_jobs=-1):
+                shared = SharedArg(big_data)
+                prepared = shared.prepare()
+
+                self.assertIsNotNone(shared.ref)
+                self.assertIs(prepared, shared.ref)
+
+                resolved = shared.resolve()
+                self.assertEqual(resolved, big_data)
+        finally:
+            client.close()
+
 
     def test_dask_shared_args_in_workers(self):
         """SharedArg with dask backend works in parallel workers via loky fallback."""
