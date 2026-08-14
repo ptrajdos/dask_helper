@@ -20,6 +20,8 @@ def dask_scheduler():
     parser.add_argument("--ip", default="127.0.0.1", help="Scheduler IP address (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=8786, help="Scheduler port (default: 8786)")
     parser.add_argument("--dashboard-port", type=int, default=8787, help="Dashboard port (default: 8787)")
+    parser.add_argument("--session-token-expiration", type=int, default=2678400, help="Token expiration time in seconds (default: 3600)")
+
     args = parser.parse_args()
 
     sys.exit(subprocess.run([
@@ -27,6 +29,7 @@ def dask_scheduler():
         f"--host={args.ip}",
         f"--port={args.port}",
         f"--dashboard-address=:{args.dashboard_port}",
+        f"--session-token-expiration={args.token_expiration}",
     ]).returncode)
 
 
