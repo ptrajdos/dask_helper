@@ -35,16 +35,14 @@ def dask_worker():
     parser = argparse.ArgumentParser(description="Start a Dask worker node")
     parser.add_argument("--ip", default="127.0.0.1", help="Scheduler IP address (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=8786, help="Scheduler port (default: 8786)")
-    parser.add_argument("--num-cpus", type=int, default=4, help="Number of CPUs (nthreads) (default: 4)")
-    parser.add_argument("--memory-gb", type=int, default=10, help="Memory limit in GB (default: 10)")
-    args = parser.parse_args()
+    args, remaining_args = parser.parse_known_args()
 
-    sys.exit(subprocess.run([
+    cmd = [
         _dask_cmd(), "worker",
         f"tcp://{args.ip}:{args.port}",
-        f"--nthreads={args.num_cpus}",
-        f"--memory-limit={_gb_to_bytes(args.memory_gb)}",
-    ]).returncode)
+    ] + remaining_args
+
+    sys.exit(subprocess.run(cmd).returncode)
 
 
 def dask_stop():
