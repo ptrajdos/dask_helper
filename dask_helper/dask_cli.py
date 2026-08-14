@@ -29,7 +29,7 @@ def dask_scheduler():
         f"--host={args.ip}",
         f"--port={args.port}",
         f"--dashboard-address=:{args.dashboard_port}",
-        f"--session-token-expiration={args.token_expiration}",
+        f"--session-token-expiration={args.session_token_expiration}",
     ]).returncode)
 
 
