@@ -14,5 +14,4 @@ def compute(name, queue):
     return name
 
 def worker(shared, x):
-    shared = shared.resolve()
     return sum(shared) + x
